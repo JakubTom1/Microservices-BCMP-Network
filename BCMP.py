@@ -8,14 +8,15 @@ np.set_printoptions(suppress=True, precision=4)
 class BcmpNetworkClosed:
     def __init__(self, R, N, K, mi_matrix, p_matrices, m, types, epsilon=1e-5):
         """
-        R: Number of classes
-        N: Number of systems (nodes)
-        K: Vector of customer populations for each class
-        mi_matrix: Service rates (mu) - shape (N, R)
-        p_matrices: List of transition matrices for each class
-        m: Number of servers at each node
-        types: Type of each node (1=FIFO, 3=IS)
-        epsilon: Convergence threshold for SUM method
+        Args:
+            R (int): Number of classes.
+            N (int): Number of systems (nodes).
+            K (list): Vector of customer populations for each class [K1, K2, ...].
+            mi_matrix (np.array): Service rates (mu) matrix of shape (N, R).
+            p_matrices (list): List of N x N transition probability matrices for each class.
+            m (list): Number of servers at each node.
+            types (list): Type of each node (1 = FIFO, 3 = IS).
+            epsilon (float): Convergence threshold for the SUM method iteration.
         """
         self.R = R
         self.N = N
@@ -26,10 +27,10 @@ class BcmpNetworkClosed:
         self.types = types
         self.epsilon = epsilon
 
-        # Calculate visit ratios (e) based on transition matrices
+        # Calculate visit ratios (e_ir) based on transition matrices
         self.e = self._solve_visit_ratios(p_matrices)
 
-        # Initialize throughputs (lambdas) with a small value
+        # Initialize lambdas with a small value
         self.lambdas = np.full(self.R, epsilon)
 
     def _solve_visit_ratios(self, p_matrices):
@@ -40,9 +41,8 @@ class BcmpNetworkClosed:
             # Formulate A * x = b for class r
             # equation: e_r = e_r * P_r
             P = p_matrices[r]
+            # Matrix form: (P^T - I) * e = 0
             A = P.T - np.eye(self.N)
-
-            # Replace last equation with normalization (e.g., e[0] = 1) to solve singularity
             A[-1] = np.zeros(self.N)
             A[-1, 0] = 1.0  # Reference node 0 has visit ratio 1
             b = np.zeros(self.N)
@@ -51,7 +51,6 @@ class BcmpNetworkClosed:
             try:
                 e_r = np.linalg.solve(A, b)
             except np.linalg.LinAlgError:
-                # Fallback for singular matrices (using least squares)
                 e_r, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
 
             e_matrix[:, r] = e_r
@@ -72,20 +71,20 @@ class BcmpNetworkClosed:
         return sum(self._calculate_rho(i, r) for r in range(self.R))
 
     def _calculate_p_m_i(self, i, rho_i):
-        """Calculates marginal probability P(m, i) for multi-server nodes[cite: 311]."""
+        """Calculates marginal probability P(m, i) for multi-server nodes."""
         m = int(self.m[i])
         if m == 1: return 1.0  # Simplified for m=1
         if rho_i >= 1: return 0.0  # Ergodicity violation check within formula
 
-        # Erlang-C like components
         mr = m * rho_i
         term1 = (mr ** m) / (math.factorial(m) * (1 - rho_i))
         term2 = sum([(mr ** k) / math.factorial(k) for k in range(m)])
         return term1 / (term2 + term1)
 
     def _get_fix_value(self, i, r, rho_i):
-        """Calculates the auxiliary function 'fix' used in SUM method iteration[cite: 331]."""
+        """Calculates the auxiliary function 'fix' used in SUM method iteration."""
         # Node Type 3 (Infinite Server)
+        # Formula: fix_ir = e_ir / mu_ir
         if self.types[i] == 3:
             return self.e[i, r] / self.mi[i, r]
 
@@ -93,6 +92,7 @@ class BcmpNetworkClosed:
         m = self.m[i]
 
         # Single Server (m=1)
+        # Formula: fix_ir = (e_ir / mu_ir) / (1 - ((K - 1) / K) * rho_i)
         if m == 1:
             if self.mi[i, r] == 0: return 0
             # Denominator modification for closed networks
@@ -101,6 +101,7 @@ class BcmpNetworkClosed:
             return (self.e[i, r] / self.mi[i, r]) / correction
 
         # Multi Server (m>1)
+        # Formula: fix_ir = (e_ir/mu_ir) + [ (e_ir / (m*mu_ir)) / (1 - ((K-m-1)/(K-m))*rho_i) ] * P_mi
         else:
             if self.mi[i, r] == 0: return 0
             term1 = self.e[i, r] / self.mi[i, r]
@@ -133,7 +134,6 @@ class BcmpNetworkClosed:
             # Check convergence
             error = np.sqrt(np.sum((self.lambdas - prev_lambdas) ** 2))
             if error < self.epsilon:
-                print(f"Converged in {iteration + 1} iterations.")
                 return
 
         print("Warning: Max iterations reached without full convergence.")
@@ -148,8 +148,6 @@ class BcmpNetworkClosed:
             rho = self._calculate_rho_total(i)
             limit = 1.0 if self.m[i] == 1 else 1.0  # Logic: rho is relative to m in formula
 
-            # Interpretation: rho calculated here is relative intensity.
-            # Real load factor is rho. If rho >= 1, queue grows infinitely.
             status = "OK" if rho < 1.0 else "UNSTABLE!"
             if rho >= 1.0: is_stable = False
 
