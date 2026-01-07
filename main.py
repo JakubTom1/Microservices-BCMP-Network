@@ -12,18 +12,18 @@ def get_microservices_scenario():
     # Service Rates (mu) - higher = faster
     # S1: API (FIFO), S2: Auth (FIFO), S3: Data (FIFO), S4: Logic (FIFO, m=2), S5: Logs (IS)
     mi = np.array([
-        [100.0, 100.0, 100.0, 100.0],  # S1:
-        [0.0, 50.0, 0.0, 60.0],  # S2: Auth
-        [200.0, 30.0, 0.0, 0.0],  # S3: Data
-        [0.0, 0.0, 5.0, 40.0],  # S4: Logic
-        [200.0, 200.0, 200.0, 200.0]  # S5: Logs
+        [100.0, 100.0, 100.0, 100.0],   # S1
+        [0.0, 50.0, 0.0, 60.0],         # S2
+        [200.0, 30.0, 0.0, 0.0],        # S3
+        [0.0, 0.0, 5.0, 40.0],          # S4
+        [200.0, 200.0, 200.0, 200.0]    # S5
     ])
 
     # Transition Matrices (Routing)
     # Class 1 (Read): S1 -> S3 -> S5 -> S1
     p1 = np.zeros((N, N))
-    p1[0, 2] = 1.0;
-    p1[2, 4] = 1.0;
+    p1[0, 2] = 1.0
+    p1[2, 4] = 1.0
     p1[4, 0] = 1.0
 
     # Class 2 (Update): S1 -> S2 -> S3 -> S5 -> S1
