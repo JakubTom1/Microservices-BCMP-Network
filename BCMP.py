@@ -131,7 +131,7 @@ class BcmpNetworkClosed:
 
             # Check convergence
             error = np.sqrt(np.sum((self.lambdas - prev_lambdas) ** 2))
-            if error < self.epsilon:
+            if error <= self.epsilon:
                 return
 
         print("Warning: Max iterations reached without full convergence.")
