@@ -38,13 +38,13 @@ class BcmpNetworkClosed:
         e_matrix = np.zeros((self.N, self.R))
 
         for r in range(self.R):
-            # Formulate A * x = b for class r
-            # equation: e_r = e_r * P_r
+            # A * x = b for class r
+            # e_r = e_r * P_r
             P = p_matrices[r]
-            # Matrix form: (P^T - I) * e = 0
+            # (P^T - I) * e = 0
             A = P.T - np.eye(self.N)
             A[-1] = np.zeros(self.N)
-            A[-1, 0] = 1.0  # Reference node 0 has visit ratio 1
+            A[-1, 0] = 1.0
             b = np.zeros(self.N)
             b[-1] = 1.0
 
@@ -62,7 +62,6 @@ class BcmpNetworkClosed:
         if self.mi[i, r] == 0:
             return 0
 
-        # Formula depends on node type
         # For IS (Type 3) or FIFO (Type 1) in SUM method context:
         return (self.lambdas[r] * self.e[i, r]) / (self.m[i] * self.mi[i, r])
 
@@ -73,8 +72,8 @@ class BcmpNetworkClosed:
     def _calculate_p_m_i(self, i, rho_i):
         """Calculates marginal probability P(m, i) for multi-server nodes."""
         m = int(self.m[i])
-        if m == 1: return 1.0  # Simplified for m=1
-        if rho_i >= 1: return 0.0  # Ergodicity violation check within formula
+        if m == 1: return 1.0
+        if rho_i >= 1: return 0.0
 
         mr = m * rho_i
         term1 = (mr ** m) / (math.factorial(m) * (1 - rho_i))
@@ -84,7 +83,7 @@ class BcmpNetworkClosed:
     def _get_fix_value(self, i, r, rho_i):
         """Calculates the auxiliary function 'fix' used in SUM method iteration."""
         # Node Type 3 (Infinite Server)
-        # Formula: fix_ir = e_ir / mu_ir
+        # fix_ir = e_ir / mu_ir
         if self.types[i] == 3:
             return self.e[i, r] / self.mi[i, r]
 
@@ -92,7 +91,7 @@ class BcmpNetworkClosed:
         m = self.m[i]
 
         # Single Server (m=1)
-        # Formula: fix_ir = (e_ir / mu_ir) / (1 - ((K - 1) / K) * rho_i)
+        # fix_ir = (e_ir / mu_ir) / (1 - ((K - 1) / K) * rho_i)
         if m == 1:
             if self.mi[i, r] == 0: return 0
             # Denominator modification for closed networks
@@ -101,7 +100,7 @@ class BcmpNetworkClosed:
             return (self.e[i, r] / self.mi[i, r]) / correction
 
         # Multi Server (m>1)
-        # Formula: fix_ir = (e_ir/mu_ir) + [ (e_ir / (m*mu_ir)) / (1 - ((K-m-1)/(K-m))*rho_i) ] * P_mi
+        # fix_ir = (e_ir/mu_ir) + [ (e_ir / (m*mu_ir)) / (1 - ((K-m-1)/(K-m))*rho_i) ] * P_mi
         else:
             if self.mi[i, r] == 0: return 0
             term1 = self.e[i, r] / self.mi[i, r]
@@ -119,7 +118,6 @@ class BcmpNetworkClosed:
         for iteration in range(max_iter):
             prev_lambdas = np.copy(self.lambdas)
 
-            # Recalculate lambdas for each class
             for r in range(self.R):
                 denom = 0
                 for i in range(self.N):
@@ -143,10 +141,10 @@ class BcmpNetworkClosed:
         print("\n--- Ergodicity Check ---")
         is_stable = True
         for i in range(self.N):
-            if self.types[i] == 3: continue  # IS nodes are always stable
+            if self.types[i] == 3: continue
 
             rho = self._calculate_rho_total(i)
-            limit = 1.0 if self.m[i] == 1 else 1.0  # Logic: rho is relative to m in formula
+            limit = 1.0 if self.m[i] == 1 else 1.0
 
             status = "OK" if rho < 1.0 else "UNSTABLE!"
             if rho >= 1.0: is_stable = False
